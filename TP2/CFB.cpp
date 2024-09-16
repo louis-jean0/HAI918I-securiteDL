@@ -37,14 +37,17 @@ int main(int argc, char* argv[]) {
     unsigned char roundKeys[176]; // Pour AES-128, la taille est 176 octets
     aes.KeyExpansion(key, roundKeys);
 
-    unsigned char chiffre[16] = {
+    unsigned char IV[16] = {
         0xA1, 0x23, 0x94, 0x03,
         0xCF, 0x01, 0x66, 0x81,
         0x55, 0x90, 0x0A, 0xCB,
         0x0C, 0x61, 0x0E, 0xFA
     };
 
-    for(int i = 0; i < nH; i += 4) {
+    unsigned char chiffre[16];
+    memcpy(chiffre, IV, 16);
+
+    for(int i = 0; i < nH; i+=4) {
         for(int j = 0; j < nW; j+=4) {
             unsigned char bloc[16];
             for(int di = 0; di < 4; ++di) {
@@ -57,15 +60,31 @@ int main(int argc, char* argv[]) {
             aes.EncryptBlock(chiffre, chiffre, roundKeys);
             unsigned char bloc_chiffre[16];
             aes.XorBlocks(bloc, chiffre, bloc_chiffre, 16);
+            memcpy(chiffre, bloc_chiffre, 16);
             for(int di = 0; di < 4; ++di) {
                 for(int dj = 0; dj < 4; ++dj) {
                     int index = (i + di) * nW + (j + dj);
                     ImgChiffree[index] = bloc_chiffre[di * 4 + dj];
                 }
             }
-            // Déchiffrage
+        }
+    }
+
+    // Déchiffrage (obligé de refaire une boucle entière)
+    for(int i = 0; i < nH; i+=4) {
+        for(int j = 0; j < nW; j+=4) {
+            unsigned char bloc_chiffre[16];
+            for(int di = 0; di < 4; ++di) {
+                for(int dj = 0; dj < 4; ++dj) {
+                    int index = (i + di) * nW + (j + dj);
+                    bloc_chiffre[di * 4 + dj] = ImgChiffree[index];
+                }
+            }
+            memcpy(chiffre, IV, 16);
+            aes.EncryptBlock(chiffre, chiffre, roundKeys);
             unsigned char bloc_dechiffre[16];
             aes.XorBlocks(bloc_chiffre, chiffre, bloc_dechiffre, 16);
+            memcpy(chiffre, bloc_chiffre, 16);
             for(int di = 0; di < 4; ++di) {
                 for(int dj = 0; dj < 4; ++dj) {
                     int index = (i + di) * nW + (j + dj);
@@ -74,7 +93,7 @@ int main(int argc, char* argv[]) {
             }
         }
     }
-
+       
     ecrire_image_pgm(nomImgChiffree, ImgChiffree, nH, nW);
     ecrire_image_pgm(nomImgDechiffree, ImgDechiffree, nH, nW);
 
